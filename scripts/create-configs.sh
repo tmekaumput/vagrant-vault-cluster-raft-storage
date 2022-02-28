@@ -10,10 +10,11 @@ if [[ "${NODE_ID}" != "${TRANSIT_NODE_ID}" ]]; then
   export TRANSIT_NODE_ADDRESS=$5
   if [[ "${NODE_ID}" != "${LEADER_NODE_ID}" ]]; then
     export LEADER_API_ADDRESS="$6"
+    #LEADER_API_ADDRESSES="$6"
   fi
 fi
 
-UNSEAL_TOKEN=$(cat /var/shared/autounseal.token.unwrapped)
+UNSEAL_TOKEN=$(sudo cat /var/shared/autounseal.token.unwrapped)
 DATA_DIR="/var/data/raft-vault"
 
 export NODE_ID DATA_DIR ADDRESS TRANSIT_NODE_ID
@@ -22,8 +23,11 @@ function config_cluster_leader_node {
 
   rm -f vault.hcl
 
+  sudo cp /tmp/license.txt /etc/vault.d/license.txt
+
   cat <<-EOF > vault.hcl
 
+  license_path = "/etc/vault.d/license.txt"
   storage "raft" {
     path    = "${DATA_DIR}"
     node_id = "vault_${NODE_ID}"
@@ -56,14 +60,23 @@ function config_cluster_follower_node {
 
   rm -f vault.hcl
 
+  sudo cp /tmp/license.txt /etc/vault.d/license.txt
+
   cat <<-EOF > vault.hcl
 
+  license_path = "/etc/vault.d/license.txt"
   storage "raft" {
     path    = "${DATA_DIR}"
     node_id = "vault_${NODE_ID}"
+
+    #for LEADER_API_ADDRESS in "${LEADER_API_ADDRESSES[@]}"
+    #do
+
     retry_join {
       leader_api_addr = "${LEADER_API_ADDRESS}"
     }
+
+    #done
   }
   listener "tcp" {
     address     = "0.0.0.0:8200"
@@ -94,6 +107,9 @@ EOF
 function config_transit_node {
 
   rm -f vault.hcl
+
+  sudo cp /tmp/license.txt /etc/vault.d/license.txt
+
   cat <<-EOF > vault.hcl
     license_path = "/etc/vault.d/license.txt"
     storage "inmem" {}

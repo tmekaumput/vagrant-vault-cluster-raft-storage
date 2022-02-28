@@ -3,6 +3,9 @@ set -x
 
 
 vault_systemd () {
+
+if sudo test ! -f ${1}/vault.service; then
+
 sudo bash -c "cat >${1}/vault.service" << 'EOF'
 [Unit]
 Description=Vault Agent
@@ -20,6 +23,12 @@ Group=vault
 [Install]
 WantedBy=multi-user.target
 EOF
+
+else
+
+  echo "Systemd file, ${1}/vault.service, already exists"
+fi
+
 }
 
 SYSTEMD_DIR="/etc/systemd/system"

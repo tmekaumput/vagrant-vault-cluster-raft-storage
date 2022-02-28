@@ -2,6 +2,8 @@
 # vi: set ft=ruby :
 
 shared_dir="/var/shared"
+GID=1001
+UID=1001
 
 transit_node = {
   :id => "node0",
@@ -26,17 +28,38 @@ followers = [
     :id => "node3",
     :ip => "192.168.56.152",
     :hostname => "vault-follower2"    
+  },
+  {
+    :id => "node4",
+    :ip => "192.168.56.153",
+    :hostname => "vault-follower3"    
+  },
+  {
+    :id => "node5",
+    :ip => "192.168.56.154",
+    :hostname => "vault-follower4"    
+  },
+  {
+    :id => "node6",
+    :ip => "192.168.56.155",
+    :hostname => "vault-follower5"    
+  },
+  {
+    :id => "node7",
+    :ip => "192.168.56.156",
+    :hostname => "vault-follower6"    
   }
 ]
 
 
 Vagrant.configure("2") do |config|
   config.vm.provider "virtualbox" do |vb|
-    vb.customize ["modifyvm", :id, "--memory", "512"]
+    vb.customize ["modifyvm", :id, "--memory", "768"]
     vb.customize ["modifyvm", :id, "--cpus", "1"]
     vb.customize ["modifyvm", :id, "--cpuexecutioncap", "50"]
     vb.customize ["modifyvm", :id, "--chipset", "ich9"]
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
   end
   config.vm.define "transit_node" do |vault_transit|
     vault_transit.vm.box = "bento/centos-7.9"
@@ -44,10 +67,11 @@ Vagrant.configure("2") do |config|
     vault_transit.vm.hostname = transit_node[:hostname]
     vault_transit.vm.network "private_network", ip: transit_node[:ip]
     vault_transit.vm.network "forwarded_port", guest: 8200, host: 8200, auto_correct: true
-    vault_transit.vm.provision "shell", path: "scripts/setup-user.sh", args: "vault"
-    vault_transit.vm.synced_folder "data/", shared_dir
+    vault_transit.vm.provision "shell", path: "scripts/setup-user.sh", args: ["vault", UID, GID]
+    vault_transit.vm.synced_folder "data/", shared_dir, owner: "vault",  group: "vault", :mount_options => ["uid=#{UID},gid=#{GID},dmode=744,fmode=744"]
+    vault_transit.vm.provision "file", source: "./license.txt", destination: "/tmp/license.txt"
     vault_transit.vm.provision "shell", path: "scripts/common.sh"
-    vault_transit.vm.provision "shell", path: "scripts/install-vault.sh", args: transit_node[:ip]
+    vault_transit.vm.provision "shell", path: "scripts/install-vault.sh", args: [transit_node[:ip], shared_dir]
     vault_transit.vm.provision "shell", path: "scripts/create-systemd-unit.sh"
     vault_transit.vm.provision "shell", path: "scripts/create-configs.sh", args: [ transit_node[:id], transit_node[:ip], transit_node[:id], leader_node[:id] ]
     vault_transit.vm.provision "shell", inline: "sudo systemctl enable vault.service"
@@ -59,11 +83,12 @@ Vagrant.configure("2") do |config|
     vault_leader.vm.box_version = "202110.25.0"
     vault_leader.vm.hostname = leader_node[:hostname]
     vault_leader.vm.network "private_network", ip: leader_node[:ip]
-    vault_leader.vm.network "forwarded_port", guest: 8200, host: 8200, auto_correct: true
-    vault_leader.vm.provision "shell", path: "scripts/setup-user.sh", args: "vault"
-    vault_leader.vm.synced_folder "data/", shared_dir
+    vault_leader.vm.network "forwarded_port", guest: 8200, host: 9200, auto_correct: true
+    vault_leader.vm.provision "shell", path: "scripts/setup-user.sh", args: ["vault", UID, GID]
+    vault_leader.vm.synced_folder "data/", shared_dir, owner: "vault",  group: "vault", :mount_options => ["uid=#{UID},gid=#{GID},dmode=744,fmode=744"]
+    vault_leader.vm.provision "file", source: "./license.txt", destination: "/tmp/license.txt"
     vault_leader.vm.provision "shell", path: "scripts/common.sh"
-    vault_leader.vm.provision "shell", path: "scripts/install-vault.sh", args: leader_node[:ip]
+    vault_leader.vm.provision "shell", path: "scripts/install-vault.sh", args: [leader_node[:ip], shared_dir]
     vault_leader.vm.provision "shell", path: "scripts/setup-unwrap-token.sh", args: [ transit_node[:ip], shared_dir ]
     vault_leader.vm.provision "shell", path: "scripts/create-systemd-unit.sh"
     vault_leader.vm.provision "shell", path: "scripts/create-configs.sh", args: [leader_node[:id], leader_node[:ip], transit_node[:id], leader_node[:id], transit_node[:ip]]
@@ -78,11 +103,12 @@ Vagrant.configure("2") do |config|
       follower_node.vm.box_version = "202110.25.0"
       follower_node.vm.hostname = follower[:hostname]
       follower_node.vm.network "private_network", ip: follower[:ip]
-      follower_node.vm.network "forwarded_port", guest: 8200, host: 8201, auto_correct: true
-      follower_node.vm.provision "shell", path: "scripts/setup-user.sh", args: "vault"
-      follower_node.vm.synced_folder "data/", shared_dir
+      follower_node.vm.network "forwarded_port", guest: 8200, host: 9201, auto_correct: true
+      follower_node.vm.provision "shell", path: "scripts/setup-user.sh", args: ["vault", UID, GID]
+      follower_node.vm.synced_folder "data/", shared_dir, owner: "vault",  group: "vault", :mount_options => ["uid=#{UID},gid=#{GID},dmode=744,fmode=744"]
+      follower_node.vm.provision "file", source: "./license.txt", destination: "/tmp/license.txt"
       follower_node.vm.provision "shell", path: "scripts/common.sh"
-      follower_node.vm.provision "shell", path: "scripts/install-vault.sh", args: follower[:ip]
+      follower_node.vm.provision "shell", path: "scripts/install-vault.sh", args: [follower[:ip], shared_dir]
       follower_node.vm.provision "shell", path: "scripts/create-systemd-unit.sh"
       follower_node.vm.provision "shell", path: "scripts/create-configs.sh", args: [follower[:id], follower[:ip], transit_node[:id], leader_node[:id], transit_node[:ip], leader_node[:api_addr]]
       follower_node.vm.provision "shell", inline: "sudo systemctl enable vault.service"
